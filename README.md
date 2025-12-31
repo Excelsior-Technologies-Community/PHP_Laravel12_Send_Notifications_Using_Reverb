@@ -1,4 +1,13 @@
-# PHP Laravel 12 – Send Real-Time Notifications Using Reverb
+# PHP_Laravel12_Send_Notifications_Using_Reverb
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" />
+  <img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=for-the-badge&logo=php&logoColor=white" />
+  <img src="https://img.shields.io/badge/Reverb-WebSockets-6C47FF?style=for-the-badge&logo=socketdotio&logoColor=white" />
+  <img src="https://img.shields.io/badge/Redis-Queue%20%7C%20Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white" />
+  <img src="https://img.shields.io/badge/Real--Time-Notifications-success?style=for-the-badge" />
+</p>
+
 
 ##  Overview
 
