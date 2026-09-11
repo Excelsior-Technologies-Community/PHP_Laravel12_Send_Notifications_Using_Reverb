@@ -12,20 +12,16 @@ class User extends Authenticatable
 
     /**
      * The attributes that are mass assignable.
-     *
-     * @var array
      */
     protected $fillable = [
         'name',
         'email',
         'password',
-        'is_admin'
+        'is_admin',
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array
+     * The attributes that should be hidden.
      */
     protected $hidden = [
         'password',
@@ -33,15 +29,39 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array
+     * The attributes that should be cast.
      */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * User's posts.
+     */
+    public function posts()
+    {
+        return $this->hasMany(Post::class);
+    }
+
+    /**
+     * User's notifications.
+     */
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    /**
+     * Get unread notifications.
+     */
+    public function unreadNotifications()
+    {
+        return $this->hasMany(Notification::class)
+            ->where('is_read', false);
     }
 }

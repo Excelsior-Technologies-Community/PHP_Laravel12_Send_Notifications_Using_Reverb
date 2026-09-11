@@ -9,15 +9,25 @@ class Post extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['title', 'body', 'user_id'];
+    protected $fillable = [
+        'title',
+        'body',
+        'user_id',
+    ];
 
     /**
-     * Write code on Method
-     *
-     * @return response()
+     * Post belongs to a user.
      */
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Post has many notifications.
+     */
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
     }
 }
