@@ -20,25 +20,16 @@ class PostCreate implements ShouldBroadcast, ShouldQueue
         $this->post = $post->load('user');
     }
 
-    /**
-     * Broadcast on public posts channel.
-     */
     public function broadcastOn(): Channel
     {
         return new Channel('posts');
     }
 
-    /**
-     * Broadcast event name.
-     */
     public function broadcastAs(): string
     {
         return 'create';
     }
 
-    /**
-     * Data sent to connected browsers.
-     */
     public function broadcastWith(): array
     {
         return [
@@ -50,13 +41,19 @@ class PostCreate implements ShouldBroadcast, ShouldQueue
 
             'user_id' => $this->post->user_id,
 
-            'user_name' => $this->post->user?->name ?? 'Unknown User',
+            'user_name' => $this->post->user?->name
+                ?? 'Unknown User',
 
             'created_at' => $this->post->created_at
-                ? $this->post->created_at->format('d M Y, h:i A')
-                : now()->format('d M Y, h:i A'),
+                ? $this->post->created_at->format(
+                    'd M Y, h:i A'
+                )
+                : now()->format(
+                    'd M Y, h:i A'
+                ),
 
-            'message' => "New post received: {$this->post->title}",
+            'message' =>
+                "New post received: {$this->post->title}",
 
             'type' => 'post_created',
         ];
