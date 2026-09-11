@@ -11,45 +11,81 @@ use Illuminate\Http\Request;
 
 class PostController extends Controller
 {
-    /**
-     * Display posts.
-     */
-    public function index()
+    /*
+    |--------------------------------------------------------------------------
+    | Posts List
+    |--------------------------------------------------------------------------
+    */
+
+    public function index(Request $request)
     {
+        $search = trim(
+            (string) $request->input('search')
+        );
+
+        $sort = $request->input(
+            'sort',
+            'newest'
+        );
+
         $posts = Post::with('user')
-            ->latest()
-            ->get();
+            ->search($search);
 
-        $unreadCount = 0;
+        switch ($sort) {
 
-        if (auth()->check()) {
-            $unreadCount = Notification::where('user_id', auth()->id())
-                ->where('is_read', false)
-                ->count();
+            case 'oldest':
+                $posts->orderBy(
+                    'created_at',
+                    'asc'
+                );
+                break;
+
+            case 'title_asc':
+                $posts->orderBy(
+                    'title',
+                    'asc'
+                );
+                break;
+
+            case 'title_desc':
+                $posts->orderBy(
+                    'title',
+                    'desc'
+                );
+                break;
+
+            default:
+                $posts->latest();
+                break;
         }
 
-        return view('posts', compact(
+        $posts = $posts
+            ->paginate(5)
+            ->withQueryString();
+
+        return view(
             'posts',
-            'unreadCount'
-        ));
+            compact(
+                'posts',
+                'search',
+                'sort'
+            )
+        );
     }
 
-    /**
-     * Store a new post.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Create Post
+    |--------------------------------------------------------------------------
+    */
+
     public function store(Request $request)
     {
         if (!auth()->check()) {
             abort(403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validate
-        |--------------------------------------------------------------------------
-        */
-
-        $request->validate([
+        $validated = $request->validate([
             'title' => [
                 'required',
                 'string',
@@ -63,63 +99,54 @@ class PostController extends Controller
             ],
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Create Post
-        |--------------------------------------------------------------------------
-        */
-
         $post = Post::create([
             'user_id' => auth()->id(),
-            'title' => $request->title,
-            'body' => $request->body,
+            'title' => $validated['title'],
+            'body' => $validated['body'],
         ]);
-
-        $post->load('user');
 
         /*
         |--------------------------------------------------------------------------
-        | Create Notification For Every Admin
+        | Real-Time Post Event
         |--------------------------------------------------------------------------
         */
 
-        $admins = User::where('is_admin', true)->get();
+        event(
+            new PostCreate($post)
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create Notification For Admin Users
+        |--------------------------------------------------------------------------
+        */
+
+        $admins = User::where(
+            'is_admin',
+            true
+        )->get();
 
         foreach ($admins as $admin) {
 
             $notification = Notification::create([
                 'user_id' => $admin->id,
-
                 'post_id' => $post->id,
-
                 'title' => 'New Post Created',
-
-                'message' => auth()->user()->name .
-                    " created a new post: {$post->title}",
-
+                'message' =>
+                    "New post received: {$post->title}",
                 'is_read' => false,
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Broadcast Notification
-            |--------------------------------------------------------------------------
-            */
-
-            event(new NotificationCreated($notification));
+            event(
+                new NotificationCreated(
+                    $notification
+                )
+            );
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Broadcast New Post
-        |--------------------------------------------------------------------------
-        */
-
-        event(new PostCreate($post));
 
         return back()->with(
             'success',
-            'Post created successfully and real-time notification sent.'
+            'Post created successfully.'
         );
     }
 }
