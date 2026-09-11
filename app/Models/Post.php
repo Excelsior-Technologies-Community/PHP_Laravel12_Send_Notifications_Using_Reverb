@@ -15,19 +15,37 @@ class Post extends Model
         'user_id',
     ];
 
-    /**
-     * Post belongs to a user.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
+
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Post has many notifications.
-     */
     public function notifications()
     {
         return $this->hasMany(Notification::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeSearch($query, ?string $search)
+    {
+        if (!$search) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($search) {
+            $q->where('title', 'like', "%{$search}%")
+                ->orWhere('body', 'like', "%{$search}%");
+        });
     }
 }

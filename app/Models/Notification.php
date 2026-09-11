@@ -23,19 +23,43 @@ class Notification extends Model
         'read_at' => 'datetime',
     ];
 
-    /**
-     * Notification belongs to a user.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
+
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Notification belongs to a post.
-     */
     public function post()
     {
         return $this->belongsTo(Post::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    public function markAsRead(): void
+    {
+        if (!$this->is_read) {
+            $this->update([
+                'is_read' => true,
+                'read_at' => now(),
+            ]);
+        }
+    }
+
+    public function markAsUnread(): void
+    {
+        $this->update([
+            'is_read' => false,
+            'read_at' => null,
+        ]);
     }
 }

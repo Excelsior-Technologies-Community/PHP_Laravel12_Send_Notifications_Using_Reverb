@@ -17,30 +17,31 @@ class NotificationCreated implements ShouldBroadcast, ShouldQueue
 
     public function __construct(Notification $notification)
     {
-        $this->notification = $notification->load('post', 'user');
+        $this->notification = $notification->load(
+            'post',
+            'user'
+        );
     }
 
-    /**
-     * Broadcast notification to the posts channel.
-     */
     public function broadcastOn(): Channel
     {
         return new Channel('posts');
     }
 
-    /**
-     * Event name.
-     */
     public function broadcastAs(): string
     {
         return 'notification.created';
     }
 
-    /**
-     * Broadcast data.
-     */
     public function broadcastWith(): array
     {
+        $unreadCount = Notification::where(
+            'user_id',
+            $this->notification->user_id
+        )
+            ->where('is_read', false)
+            ->count();
+
         return [
             'id' => $this->notification->id,
 
@@ -53,12 +54,16 @@ class NotificationCreated implements ShouldBroadcast, ShouldQueue
             'is_read' => $this->notification->is_read,
 
             'created_at' => $this->notification->created_at
-                ? $this->notification->created_at->format('d M Y, h:i A')
-                : now()->format('d M Y, h:i A'),
+                ? $this->notification->created_at->format(
+                    'd M Y, h:i A'
+                )
+                : now()->format(
+                    'd M Y, h:i A'
+                ),
 
-            'unread_count' => Notification::where('user_id', $this->notification->user_id)
-                ->where('is_read', false)
-                ->count(),
+            'unread_count' => $unreadCount,
+
+            'type' => 'notification_created',
         ];
     }
 }
