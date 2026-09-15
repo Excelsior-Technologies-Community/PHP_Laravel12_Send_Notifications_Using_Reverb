@@ -18,6 +18,7 @@ class User extends Authenticatable
         'email',
         'password',
         'is_admin',
+        'avatar',
     ];
 
     /**
@@ -37,7 +38,15 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'avatar' => 'string',
         ];
+    }
+
+    public function getAvatarAttribute($value)
+    {
+        return $value
+            ? asset('storage/'.$value)
+            : null;
     }
 
     /**
@@ -63,5 +72,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Notification::class)
             ->where('is_read', false);
+    }
+
+    public function getUnreadNotificationsCountAttribute()
+    {
+        return $this->unreadNotifications()->count();
     }
 }

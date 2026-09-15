@@ -11,9 +11,22 @@ class Post extends Model
 
     protected $fillable = [
         'title',
+        'category',
         'body',
+        'image',
         'user_id',
     ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+    ];
+
+    public function getImageAttribute($value)
+    {
+        return $value
+            ? asset('storage/'.$value)
+            : null;
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -39,13 +52,28 @@ class Post extends Model
 
     public function scopeSearch($query, ?string $search)
     {
-        if (!$search) {
+        if (! $search) {
             return $query;
         }
 
         return $query->where(function ($q) use ($search) {
             $q->where('title', 'like', "%{$search}%")
-                ->orWhere('body', 'like', "%{$search}%");
+                ->orWhere('body', 'like', "%{$search}%")
+                ->orWhere('category', 'like', "%{$search}%");
         });
+    }
+
+    public function scopeCategory($query, ?string $category)
+    {
+        if (! $category) {
+            return $query;
+        }
+
+        return $query->where('category', $category);
+    }
+
+    public static function categories(): \Illuminate\Support\Collection
+    {
+        return self::pluck('category')->filter()->unique()->values();
     }
 }
