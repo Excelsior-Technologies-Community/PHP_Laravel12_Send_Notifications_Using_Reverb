@@ -151,6 +151,32 @@
 
                             </li>
 
+                            <li class="nav-item">
+
+                                <a
+                                    class="nav-link"
+                                    href="{{ route('profile.show') }}"
+                                >
+                                    <i class="fa fa-user"></i>
+                                    Profile
+                                </a>
+
+                            </li>
+
+                        @else
+
+                            <li class="nav-item">
+
+                                <a
+                                    class="nav-link"
+                                    href="{{ route('profile.show') }}"
+                                >
+                                    <i class="fa fa-user"></i>
+                                    My Profile
+                                </a>
+
+                            </li>
+
                         @endif
 
                     @endauth
@@ -255,6 +281,13 @@
 
                                 <div class="text-center">
 
+                                    <a
+                                        href="{{ route('notifications.index') }}"
+                                        class="btn btn-sm btn-outline-primary"
+                                    >
+                                        <i class="fa fa-list"></i> View All
+                                    </a>
+
                                     <button
                                         type="button"
                                         class="btn btn-sm btn-danger mb-2"
@@ -291,6 +324,40 @@
 
                         </li>
 
+                        <!-- Online Status -->
+
+                        <li class="nav-item">
+
+                            <span
+                                class="nav-link"
+                                title="You are online"
+                                id="online-status-container"
+                            >
+
+                                <span
+                                    class="badge bg-success"
+                                    id="online-badge"
+                                    style="display:none;"
+                                >
+
+                                    <i class="fa fa-circle"></i> Online
+
+                                </span>
+
+                                <span
+                                    class="badge bg-secondary"
+                                    id="offline-badge"
+                                >
+
+                                    <i class="fa fa-circle"></i> Offline
+
+                                </span>
+
+                            </span>
+
+                        </li>
+
+
                         <!-- User -->
 
                         <li class="nav-item dropdown">
@@ -305,6 +372,17 @@
                                 aria-expanded="false"
                             >
 
+                                @if(auth()->user()->avatar)
+                                    <img
+                                        src="{{ auth()->user()->avatar }}"
+                                        alt="{{ auth()->user()->name }}"
+                                        class="rounded-circle"
+                                        style="width: 32px; height: 32px; object-fit: cover; margin-right: 5px;"
+                                    >
+                                @else
+                                    <i class="fa fa-user-circle fa-lg"></i>
+                                @endif
+
                                 {{ Auth::user()->name }}
 
                             </a>
@@ -315,13 +393,29 @@
 
                                 <a
                                     class="dropdown-item"
+                                    href="{{ route('profile.show') }}"
+                                >
+                                    <i class="fa fa-user"></i> Profile
+                                </a>
+
+                                <a
+                                    class="dropdown-item"
+                                    href="{{ route('profile.edit') }}"
+                                >
+                                    <i class="fa fa-cog"></i> Settings
+                                </a>
+
+                                <hr class="my-1">
+
+                                <a
+                                    class="dropdown-item"
                                     href="{{ route('logout') }}"
                                     onclick="
                                         event.preventDefault();
                                         document.getElementById('logout-form').submit();
                                     "
                                 >
-                                    Logout
+                                    <i class="fa fa-sign-out-alt"></i> Logout
                                 </a>
 
                                 <form
@@ -367,6 +461,48 @@ document.addEventListener('DOMContentLoaded', function () {
     |--------------------------------------------------------------------------
     */
 
+    const userId = {{ auth()->id() }};
+
+    const originalTitle = document.title;
+
+    function setUnreadBadge(count) {
+
+        if (count > 0) {
+            document.title = `(${count}) ${originalTitle}`;
+        } else {
+            document.title = originalTitle;
+        }
+
+        updateFavicon(count);
+
+    }
+
+    function updateFavicon(count) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#198754';
+        ctx.fillRect(0, 0, 32, 32);
+
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(count, 16, 18);
+
+        let link = document.getElementById('dynamic-favicon');
+        if (!link) {
+            link = document.createElement('link');
+            link.id = 'dynamic-favicon';
+            link.rel = 'icon';
+            link.type = 'image/png';
+            document.head.appendChild(link);
+        }
+        link.href = canvas.toDataURL('image/png');
+    }
+
     const notificationList =
         document.getElementById('notification-list');
 
@@ -374,6 +510,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('notification-count');
 
     function updateNotificationCount(count) {
+
+        setUnreadBadge(count);
 
         if (!notificationCount) {
             return;
@@ -561,11 +699,43 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Load Notifications
+    | Online / Offline Status
+    |--------------------------------------------------------------------------
+    */
+
+    function markOnline() {
+        fetch('{{ route("user.online") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Accept': 'application/json'
+            }
+        });
+    }
+
+    function markOffline() {
+        fetch('{{ route("user.offline") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Accept': 'application/json'
+            }
+        });
+    }
+
+    window.addEventListener('beforeunload', function () {
+        markOffline();
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Initial Load
     |--------------------------------------------------------------------------
     */
 
     loadNotifications();
+
+    markOnline();
 
     /*
     |--------------------------------------------------------------------------
@@ -744,90 +914,111 @@ document.addEventListener('DOMContentLoaded', function () {
 
         /*
         |--------------------------------------------------------------------------
-        | Real-Time Notification
+        | Real-Time Notification (Private Channel per User)
         |--------------------------------------------------------------------------
         */
 
         window.Echo
-            .channel('posts')
-            .listen(
-                '.notification.created',
-                function (data) {
+            .private(`notification.${userId}`)
+            .listen('.created', function (data) {
 
-                    /*
-                    | Only process notification for current user.
-                    |
-                    | The event contains unread_count calculated
-                    | for the notification owner.
-                    */
-
-                    const notificationList =
-                        document.getElementById(
-                            'notification-list'
-                        );
-
-                    updateNotificationCount(
-                        data.unread_count
+                const notificationList =
+                    document.getElementById(
+                        'notification-list'
                     );
 
-                    if (notificationList) {
+                updateNotificationCount(
+                    data.unread_count
+                );
 
-                        const emptyMessage =
-                            notificationList.querySelector(
-                                '.text-muted'
-                            );
+                if (notificationList) {
 
-                        if (emptyMessage) {
-                            emptyMessage.remove();
-                        }
+                    const emptyMessage =
+                        notificationList.querySelector(
+                            '.text-muted'
+                        );
 
-                        const html = `
+                    if (emptyMessage) {
+                        emptyMessage.remove();
+                    }
 
-                            <div
-                                class="notification-item notification-unread"
-                                data-id="${data.id}"
-                            >
+                    const html = `
 
-                                <div class="d-flex">
+                        <div
+                            class="notification-item notification-unread"
+                            data-id="${data.id}"
+                        >
 
-                                    <div class="me-2">
-                                        <i class="fa fa-bell text-success"></i>
+                            <div class="d-flex">
+
+                                <div class="me-2">
+                                    <i class="fa fa-bell text-success"></i>
+                                </div>
+
+                                <div>
+
+                                    <strong>
+                                        ${escapeHtml(data.title)}
+                                    </strong>
+
+                                    <div class="small text-muted">
+                                        ${escapeHtml(data.message)}
                                     </div>
 
-                                    <div>
-
-                                        <strong>
-                                            ${escapeHtml(data.title)}
-                                        </strong>
-
-                                        <div class="small text-muted">
-                                            ${escapeHtml(data.message)}
-                                        </div>
-
-                                        <small class="text-secondary">
-                                            ${escapeHtml(data.created_at)}
-                                        </small>
-
-                                    </div>
+                                    <small class="text-secondary">
+                                        ${escapeHtml(data.created_at)}
+                                    </small>
 
                                 </div>
 
                             </div>
 
-                        `;
+                        </div>
 
-                        notificationList.insertAdjacentHTML(
-                            'afterbegin',
-                            html
-                        );
+                    `;
 
-                        bindNotificationClicks();
+                    notificationList.insertAdjacentHTML(
+                        'afterbegin',
+                        html
+                    );
 
-                    }
+                    bindNotificationClicks();
 
                 }
-            );
 
+                setUnreadBadge(data.unread_count);
+
+            });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Presence Channel - Online Admins
+        |--------------------------------------------------------------------------
+        */
+
+        window.Echo.join('presence.online')
+            .here(function (admins) {
+                updateOnlineBadge(admins.length > 0);
+            })
+            .joining(function (admin) {
+                updateOnlineBadge(true);
+            })
+            .leaving(function (admin) {
+                const channel = window.Echo.connector.presences['presence.online'];
+                const count = channel ? Object.keys(channel).length : 0;
+                updateOnlineBadge(count > 0);
+            });
+
+    }
+
+    function updateOnlineBadge(isOnline) {
+        const onlineBadge = document.getElementById('online-badge');
+        const offlineBadge = document.getElementById('offline-badge');
+
+        if (onlineBadge && offlineBadge) {
+            onlineBadge.style.display = isOnline ? 'inline-block' : 'none';
+            offlineBadge.style.display = isOnline ? 'none' : 'inline-block';
+        }
     }
 
     @endauth

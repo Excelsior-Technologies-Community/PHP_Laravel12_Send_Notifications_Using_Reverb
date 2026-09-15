@@ -320,15 +320,44 @@
                     class="card-body"
                 >
 
-                    <div class="text-muted">
+            <div class="text-muted">
 
-                        Waiting for real-time events...
-
-                    </div>
-
-                </div>
+                Waiting for real-time events...
 
             </div>
+
+        </div>
+
+    </div>
+
+
+    {{-- ========================================================= --}}
+    {{-- ONLINE ADMINS --}}
+    {{-- ========================================================= --}}
+
+    <div class="card shadow-sm mt-4">
+
+        <div class="card-header">
+
+            <i class="fa fa-users"></i>
+
+            Online Admins
+
+            <span class="badge bg-success float-end" id="online-count">
+                0 online
+            </span>
+
+        </div>
+
+        <div class="card-body" id="online-admins-list">
+
+            <div class="text-muted">
+                Loading...
+            </div>
+
+        </div>
+
+    </div>
 
         </div>
 
@@ -426,6 +455,16 @@ document.addEventListener(
                 'recent-notifications'
             );
 
+        const onlineCountEl =
+            document.getElementById(
+                'online-count'
+            );
+
+        const onlineAdminsList =
+            document.getElementById(
+                'online-admins-list'
+            );
+
 
         /*
         |--------------------------------------------------------------------------
@@ -447,7 +486,7 @@ document.addEventListener(
             .then(
                 response => response.json()
             )
-            .then(
+             .then(
                 data => {
 
                     totalPosts.textContent =
@@ -474,6 +513,59 @@ document.addEventListener(
                     last7.textContent =
                         data.last_7_days;
 
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Online Admins
+                    |--------------------------------------------------------------------------
+                    */
+
+                    const onlineAdmins =
+                        data.online_admins
+                            ?? [];
+
+                    if (onlineCountEl) {
+                        onlineCountEl.textContent =
+                            `${onlineAdmins.length} online`;
+                    }
+
+                    if (onlineAdminsList) {
+
+                        if (onlineAdmins.length === 0) {
+
+                            onlineAdminsList.innerHTML = `
+                                <div class="text-muted">
+                                    <i class="fa fa-user-slash"></i>
+                                    No admins online.
+                                </div>
+                            `;
+
+                        } else {
+
+                            onlineAdminsList.innerHTML =
+                                onlineAdmins.map(admin => {
+
+                                    return `
+                                        <div class="d-flex align-items-center mb-2">
+                                            <span class="badge bg-success me-2">
+                                                <i class="fa fa-circle"></i>
+                                            </span>
+                                            <div>
+                                                <strong>
+                                                    ${escapeHtml(admin.name)}
+                                                </strong>
+                                                <small class="text-muted d-block">
+                                                    ${escapeHtml(admin.email)}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    `;
+
+                                }).join('');
+
+                        }
+
+                    }
 
                     /*
                     |--------------------------------------------------------------------------
@@ -594,10 +686,81 @@ document.addEventListener(
 
 
         /*
-        |--------------------------------------------------------------------------
-        | Reverb Connection
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | Presence Channel for Live Online Admin Status
+        |------------------------------------------------------------------
         */
+
+        if (window.Echo) {
+
+            window.Echo.join('presence.online')
+                .here(function (admins) {
+                    updateOnlineAdmins(admins);
+                })
+                .joining(function (admin) {
+                    loadStats();
+                })
+                .leaving(function (admin) {
+                    loadStats();
+                });
+
+        }
+
+
+        function updateOnlineAdmins(admins) {
+
+            if (onlineCountEl) {
+                onlineCountEl.textContent =
+                    `${admins.length} online`;
+            }
+
+            if (onlineAdminsList) {
+
+                if (admins.length === 0) {
+                    onlineAdminsList.innerHTML = `
+                        <div class="text-muted">
+                            <i class="fa fa-user-slash"></i>
+                            No admins online.
+                        </div>
+                    `;
+                } else {
+                    onlineAdminsList.innerHTML =
+                        admins.map(admin => {
+                            return `
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="badge bg-success me-2">
+                                        <i class="fa fa-circle"></i>
+                                    </span>
+                                    <div>
+                                        <strong>
+                                            ${escapeHtml(admin.name)}
+                                        </strong>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                }
+            }
+
+        }
+
+
+        function loadOnlineAdmins() {
+
+            fetch('{{ route('notification.dashboard.online-admins') }}', {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(r => r.json())
+            .then(data => {
+                updateOnlineAdmins(data.online_admins);
+            });
+
+        }
+
+
+        loadOnlineAdmins();
 
         if (window.Echo) {
 
@@ -672,91 +835,135 @@ document.addEventListener(
 
                         loadStats();
 
-
                         const item =
-                            document.createElement(
-                                'div'
-                            );
+                            document.createElement('div');
 
                         item.className =
                             'alert alert-success mb-2';
 
                         item.innerHTML = `
-
                             <i class="fa fa-bolt"></i>
-
-                            <strong>
-                                New Post:
-                            </strong>
-
-                            ${escapeHtml(
-                                data.title
-                            )}
-
+                            <strong>New Post:</strong>
+                            ${escapeHtml(data.title)}
                             <small class="d-block text-muted">
-
-                                Created by
-                                ${escapeHtml(
-                                    data.user_name
-                                )}
-
+                                Created by ${escapeHtml(data.user_name)}
                             </small>
-
                         `;
 
-                        activity.prepend(
-                            item
-                        );
+                        activity.prepend(item);
+
+                    }
+                );
+
+
+            window.Echo
+                .channel('posts')
+                .listen(
+                    '.update',
+                    function (data) {
+
+                        loadStats();
+
+                        const item =
+                            document.createElement('div');
+
+                        item.className =
+                            'alert alert-info mb-2';
+
+                        item.innerHTML = `
+                            <i class="fa fa-edit"></i>
+                            <strong>Post Updated:</strong>
+                            ${escapeHtml(data.title)}
+                            <small class="d-block text-muted">
+                                Updated by ${escapeHtml(data.user_name ?? 'Unknown')}
+                            </small>
+                        `;
+
+                        activity.prepend(item);
+
+                    }
+                );
+
+
+            window.Echo
+                .channel('posts')
+                .listen(
+                    '.delete',
+                    function (data) {
+
+                        loadStats();
+
+                        const item =
+                            document.createElement('div');
+
+                        item.className =
+                            'alert alert-warning mb-2';
+
+                        item.innerHTML = `
+                            <i class="fa fa-trash"></i>
+                            <strong>Post Deleted:</strong>
+                            ${escapeHtml(data.title)}
+                        `;
+
+                        activity.prepend(item);
 
                     }
                 );
 
 
             /*
-            |--------------------------------------------------------------------------
-            | Notification Event
-            |--------------------------------------------------------------------------
+            |------------------------------------------------------------------
+            | Real-Time Stats Updates (private channel)
+            |------------------------------------------------------------------
+            */
+
+            const userId = {{ auth()->id() }};
+
+            window.Echo
+                .private(`notification.${userId}`)
+                .listen('.created', function (data) {
+
+                    loadStats();
+
+                });
+
+
+            /*
+            |------------------------------------------------------------------
+            | Stats Updated Event
+            |------------------------------------------------------------------
             */
 
             window.Echo
-                .channel('posts')
-                .listen(
-                    '.notification.created',
-                    function (data) {
+                .channel('dashboard.stats')
+                .listen('.updated', function (data) {
 
-                        loadStats();
+                    totalPosts.textContent = data.total_posts;
+                    totalNotifications.textContent = data.total_notifications;
+                    unreadNotifications.textContent = data.unread_notifications;
+                    readPercentage.textContent = `${data.read_percentage}%`;
+                    todayPosts.textContent = data.today_posts;
+                    todayNotifications.textContent = data.today_notifications;
+                    last24.textContent = data.last_24_hours;
+                    last7.textContent = data.last_7_days;
 
+                    const item =
+                        document.createElement('div');
 
-                        const item =
-                            document.createElement(
-                                'div'
-                            );
+                    item.className =
+                        'alert alert-warning mb-2';
 
-                        item.className =
-                            'alert alert-warning mb-2';
+                    item.innerHTML = `
+                        <i class="fa fa-sync"></i>
+                        <strong>Stats Updated:</strong>
+                        ${data.total_notifications} total, ${data.unread_notifications} unread
+                    `;
 
-                        item.innerHTML = `
+                    activity.prepend(item);
 
-                            <i class="fa fa-bell"></i>
+                });
 
-                            <strong>
-                                Notification:
-                            </strong>
-
-                            ${escapeHtml(
-                                data.message
-                            )}
-
-                        `;
-
-                        activity.prepend(
-                            item
-                        );
-
-                    }
-                );
-
-        }
+            }
 
 
         /*
