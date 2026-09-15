@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Notification;
 use App\Models\Post;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 
 class NotificationDashboardController extends Controller
 {
@@ -22,7 +24,10 @@ class NotificationDashboardController extends Controller
         );
 
         return view(
-            'notification-dashboard'
+            'notification-dashboard',
+            [
+                'userId' => auth()->id(),
+            ]
         );
     }
 
@@ -39,16 +44,8 @@ class NotificationDashboardController extends Controller
             403
         );
 
-        $totalPosts = Post::count();
-
         $totalNotifications =
             Notification::count();
-
-        $unreadNotifications =
-            Notification::where(
-                'is_read',
-                false
-            )->count();
 
         $readNotifications =
             Notification::where(
@@ -56,43 +53,55 @@ class NotificationDashboardController extends Controller
                 true
             )->count();
 
-        $todayPosts =
-            Post::whereDate(
+        $onlineAdmins = $this->getOnlineAdmins();
+
+        return response()->json([
+            'total_posts' => Post::count(),
+
+            'total_notifications' => $totalNotifications,
+
+            'unread_notifications' => Notification::where(
+                'is_read',
+                false
+            )->count(),
+
+            'read_notifications' => $readNotifications,
+
+            'today_posts' => Post::whereDate(
                 'created_at',
                 today()
-            )->count();
+            )->count(),
 
-        $todayNotifications =
-            Notification::whereDate(
+            'today_notifications' => Notification::whereDate(
                 'created_at',
                 today()
-            )->count();
+            )->count(),
 
-        $last24Hours =
-            Notification::where(
+            'last_24_hours' => Notification::where(
                 'created_at',
                 '>=',
                 now()->subDay()
-            )->count();
+            )->count(),
 
-        $last7Days =
-            Notification::where(
+            'last_7_days' => Notification::where(
                 'created_at',
                 '>=',
                 now()->subDays(7)
-            )->count();
+            )->count(),
 
-        $readPercentage =
-            $totalNotifications > 0
-                ? round(
-                    ($readNotifications /
-                        $totalNotifications) * 100,
-                    1
-                )
-                : 0;
+            'read_percentage' => $totalNotifications > 0
+                    ? round(
+                        ($readNotifications /
+                            $totalNotifications) * 100,
+                        1
+                    )
+                    : 0,
 
-        $recentNotifications =
-            Notification::with([
+            'reverb_status' => 'connected',
+
+            'online_admins' => $onlineAdmins,
+
+            'recent_notifications' => Notification::with([
                 'user',
                 'post',
             ])
@@ -102,64 +111,58 @@ class NotificationDashboardController extends Controller
                 ->map(function ($notification) {
 
                     return [
-                        'id' =>
-                            $notification->id,
+                        'id' => $notification->id,
 
-                        'title' =>
-                            $notification->title,
+                        'title' => $notification->title,
 
-                        'message' =>
-                            $notification->message,
+                        'message' => $notification->message,
 
-                        'user' =>
-                            $notification->user?->name
+                        'user' => $notification->user?->name
                             ?? 'Unknown',
 
-                        'is_read' =>
-                            $notification->is_read,
+                        'is_read' => $notification->is_read,
 
-                        'created_at' =>
-                            $notification
-                                ->created_at
-                                ?->format(
-                                    'd M Y, h:i A'
-                                ),
+                        'created_at' => $notification
+                            ->created_at
+                            ?->format(
+                                'd M Y, h:i A'
+                            ),
                     ];
-                });
-
-        return response()->json([
-            'total_posts' =>
-                $totalPosts,
-
-            'total_notifications' =>
-                $totalNotifications,
-
-            'unread_notifications' =>
-                $unreadNotifications,
-
-            'read_notifications' =>
-                $readNotifications,
-
-            'today_posts' =>
-                $todayPosts,
-
-            'today_notifications' =>
-                $todayNotifications,
-
-            'last_24_hours' =>
-                $last24Hours,
-
-            'last_7_days' =>
-                $last7Days,
-
-            'read_percentage' =>
-                $readPercentage,
-
-            'reverb_status' =>
-                'connected',
-
-            'recent_notifications' =>
-                $recentNotifications,
+                }),
         ]);
+    }
+
+    public function onlineAdmins(): JsonResponse
+    {
+        return response()->json([
+            'online_admins' => $this->getOnlineAdmins(),
+        ]);
+    }
+
+    private function getOnlineAdmins(): array
+    {
+        $adminIds = User::where('is_admin', true)
+            ->pluck('id')
+            ->all();
+
+        $onlineKeys = array_map(
+            fn ($id) => 'user-online-'.$id,
+            $adminIds
+        );
+
+        $onlineUsers = User::whereIn('id', $adminIds)
+            ->get()
+            ->filter(function ($user) {
+                return Cache::has('user-online-'.$user->id);
+            })
+            ->values();
+
+        return $onlineUsers->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ];
+        })->toArray();
     }
 }

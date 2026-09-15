@@ -9,7 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class PostCreate implements ShouldBroadcast, ShouldQueue
+class PostDelete implements ShouldBroadcast, ShouldQueue
 {
     use Dispatchable, SerializesModels;
 
@@ -17,7 +17,7 @@ class PostCreate implements ShouldBroadcast, ShouldQueue
 
     public function __construct(Post $post)
     {
-        $this->post = $post->load('user');
+        $this->post = $post;
     }
 
     public function broadcastOn(): Channel
@@ -27,7 +27,7 @@ class PostCreate implements ShouldBroadcast, ShouldQueue
 
     public function broadcastAs(): string
     {
-        return 'create';
+        return 'delete';
     }
 
     public function broadcastWith(): array
@@ -35,17 +35,8 @@ class PostCreate implements ShouldBroadcast, ShouldQueue
         return [
             'id' => $this->post->id,
             'title' => $this->post->title,
-            'category' => $this->post->category,
-            'body' => $this->post->body,
-            'image' => $this->post->image,
-            'user_id' => $this->post->user_id,
-            'user_name' => $this->post->user?->name
-                ?? 'Unknown User',
-            'created_at' => $this->post->created_at
-                ? $this->post->created_at->format('d M Y, h:i A')
-                : now()->format('d M Y, h:i A'),
-            'message' => "New post received: {$this->post->title}",
-            'type' => 'post_created',
+            'message' => "Post deleted: {$this->post->title}",
+            'type' => 'post_deleted',
         ];
     }
 }

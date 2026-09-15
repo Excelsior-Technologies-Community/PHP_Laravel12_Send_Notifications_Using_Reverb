@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\StatsUpdated;
 use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -111,6 +112,8 @@ class NotificationController extends Controller
 
         $notification->markAsRead();
 
+        event(new StatsUpdated($this->buildStats()));
+
         return $this->countsResponse();
     }
 
@@ -129,6 +132,8 @@ class NotificationController extends Controller
         );
 
         $notification->markAsUnread();
+
+        event(new StatsUpdated($this->buildStats()));
 
         return $this->countsResponse();
     }
@@ -154,6 +159,8 @@ class NotificationController extends Controller
                 'read_at' => now(),
             ]);
 
+        event(new StatsUpdated($this->buildStats()));
+
         return response()->json([
             'success' => true,
             'unread_count' => 0,
@@ -176,6 +183,8 @@ class NotificationController extends Controller
 
         $notification->delete();
 
+        event(new StatsUpdated($this->buildStats()));
+
         return response()->json([
             'success' => true,
         ]);
@@ -193,6 +202,8 @@ class NotificationController extends Controller
             'user_id',
             auth()->id()
         )->delete();
+
+        event(new StatsUpdated($this->buildStats()));
 
         return response()->json([
             'success' => true,
@@ -232,5 +243,25 @@ class NotificationController extends Controller
             'success' => true,
             'unread_count' => $unreadCount,
         ]);
+    }
+
+    private function buildStats(): array
+    {
+        $total = Notification::count();
+        $read = Notification::where('is_read', true)->count();
+
+        return [
+            'total_posts' => \App\Models\Post::count(),
+            'total_notifications' => $total,
+            'unread_notifications' => Notification::where('is_read', false)->count(),
+            'read_notifications' => $read,
+            'today_posts' => \App\Models\Post::whereDate('created_at', today())->count(),
+            'today_notifications' => Notification::whereDate('created_at', today())->count(),
+            'last_24_hours' => Notification::where('created_at', '>=', now()->subDay())->count(),
+            'last_7_days' => Notification::where('created_at', '>=', now()->subDays(7))->count(),
+            'read_percentage' => $total > 0
+                ? round(($read / $total) * 100, 1)
+                : 0,
+        ];
     }
 }
